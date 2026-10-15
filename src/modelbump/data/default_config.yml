@@ -1,0 +1,65 @@
+# ModelBump: Dependabot-style updates for hard-coded LLM model slugs.
+# Docs: https://github.com/cheesejaguar/ModelBump
+version: 1
+
+# same-family     newer release of the same model line (Opus -> newer Opus)
+# cost-optimized  same benchmark score or better, cheaper, same ecosystem
+strategy: same-family
+
+same-family:
+  # snapshot: claude-sonnet-4-5-20250929 -> a newer dated snapshot of 4.5
+  # minor:    claude-opus-5 -> claude-opus-5-5
+  # major:    claude-opus-4-8 -> claude-opus-5-5
+  update-types: [snapshot, minor, major]
+  allow-prerelease: false        # preview / exp / beta models
+
+cost-optimized:
+  scope: ecosystem               # or "vendor" to stay with the same lab
+  max-score-drop: 0.02           # accept up to 2% below the current score
+  min-savings: 0.10              # require at least 10% lower blended price
+  price-weights: {input: 3, output: 1}
+  prefer: cheapest               # or best-score
+  preserve-open-weights: true    # open-weight models only swap for open-weight models
+  allow-older: false             # never move to a model released before the current one
+
+# Per-path overrides; the first matching entry wins.
+# updates:
+#   - paths: ["services/batch/**"]
+#     strategy: cost-optimized
+#   - paths: ["**"]
+#     strategy: same-family
+#     same-family:
+#       update-types: [snapshot, minor]
+
+exclude:
+  - "**/*.lock"
+  - "**/CHANGELOG*"
+
+# ignore:
+#   - model: "gpt-4o*"               # never touch these slugs
+#   - model: "claude-*"
+#     update-types: [major]          # allow minor bumps only
+#   - target: "*-preview*"           # never bump *to* a preview
+#   - paths: ["tests/fixtures/**"]
+
+# Ecosystems for cost-optimized mode (vendors not listed stay on their own).
+# ecosystems:
+#   chinese-open: [deepseek, qwen, moonshotai, z-ai, minimax, xiaomi, stepfun, tencent, baidu]
+
+catalog:
+  # openrouter: public model list, prices, release dates (no key needed)
+  # anthropic / openai: confirm first-party ids (ANTHROPIC_API_KEY / OPENAI_API_KEY)
+  # artificial-analysis: benchmark scores (ARTIFICIAL_ANALYSIS_API_KEY)
+  sources: [openrouter, anthropic, openai, artificial-analysis]
+  benchmark: intelligence        # intelligence | coding | math | <Artificial Analysis field>
+  # Your own scores win over Artificial Analysis, keyed by any slug of the model.
+  # scores:
+  #   claude-opus-5-5: 74
+  # scores-file: .github/model-scores.yml
+
+pull-requests:
+  grouping: per-model            # or "single" for one PR with every update
+  branch-prefix: modelbump
+  labels: [dependencies, llm-models]
+  commit-message-prefix: "chore(models):"
+  open-pull-requests-limit: 5
