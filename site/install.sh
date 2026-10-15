@@ -108,6 +108,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write # lets ModelBump create its PR labels
 
 jobs:
   modelbump:

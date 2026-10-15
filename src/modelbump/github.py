@@ -85,20 +85,29 @@ def _commit_message(group: Group, config: Config, path_prefix: str = "") -> str:
     return "\n".join(lines) + "\n"
 
 
-def _ensure_labels(root: Path, labels: tuple[str, ...]) -> None:
+def _ensure_labels(root: Path, labels: tuple[str, ...]) -> tuple[list[str], list[str]]:
+    """Create missing labels. Returns (labels to apply, labels that couldn't be
+    created). Creating labels needs the token's ``issues: write`` permission;
+    passing a label that doesn't exist to ``gh pr create`` would fail the PR."""
     if not labels:
-        return
+        return [], []
     try:
         existing = {l["name"] for l in json.loads(_run([_gh(), "label", "list", "--json", "name", "--limit", "500"], root))}
     except (GitHubError, ValueError) as e:
         log.warning("could not list labels: %s", e)
-        return
+        return [], list(labels)
+    usable, missing = [], []
     for label in labels:
-        if label not in existing:
-            try:
-                _run([_gh(), "label", "create", label, "--description", "Model slug updates by ModelBump"], root)
-            except GitHubError as e:
-                log.warning("could not create label %s: %s", label, e)
+        if label in existing:
+            usable.append(label)
+            continue
+        try:
+            _run([_gh(), "label", "create", label, "--description", "Model slug updates by ModelBump"], root)
+            usable.append(label)
+        except GitHubError as e:
+            log.warning("could not create label %s: %s", label, e)
+            missing.append(label)
+    return usable, missing
 
 
 COMMIT_TRAILER = "ModelBump-Update"
@@ -186,8 +195,13 @@ def open_pull_requests(
     ours = {p["headRefName"]: p for p in mine if p["state"].upper() == "OPEN"}
     closed = {p["headRefName"]: p for p in mine if p["state"].upper() == "CLOSED"}
     open_count = len(ours)
-    if not dry_run:
-        _ensure_labels(root, prefs.labels)
+    labels, missing_labels = (list(prefs.labels), []) if dry_run else _ensure_labels(root, prefs.labels)
+    label_note = (
+        f"labels {', '.join(missing_labels)} not applied; give the workflow `issues: write` so ModelBump can "
+        "create them"
+        if missing_labels
+        else None
+    )
 
     results: list[PullRequestResult] = []
     try:
@@ -247,7 +261,7 @@ def open_pull_requests(
                 result = PullRequestResult(branch, title, "updated", existing["url"])
             else:
                 cmd = [_gh(), "pr", "create", "--base", base, "--head", branch, "--title", title, "--body-file", "-"]
-                for label in prefs.labels:
+                for label in labels:
                     cmd += ["--label", label]
                 if prefs.reviewers:
                     cmd += ["--reviewer", ",".join(prefs.reviewers)]
@@ -263,7 +277,7 @@ def open_pull_requests(
                             "or pass a GitHub App / personal access token as the action's github-token."
                         ) from e
                     raise
-                result = PullRequestResult(branch, title, "created", url)
+                result = PullRequestResult(branch, title, "created", url, detail=label_note)
                 open_count += 1
             results.append(result)
 

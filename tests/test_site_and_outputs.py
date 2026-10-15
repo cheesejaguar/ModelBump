@@ -83,6 +83,7 @@ def test_install_script(tmp_path, args, strategy, updates, grouping):
     )
     assert proc.returncode == 0, proc.stderr
     workflow = yaml.safe_load((tmp_path / ".github/workflows/modelbump.yml").read_text())
+    assert workflow["permissions"] == {"contents": "write", "pull-requests": "write", "issues": "write"}
     step = workflow["jobs"]["modelbump"]["steps"][1]
     assert step["uses"] == "cheesejaguar/ModelBump@v0"
     config = load_config(tmp_path)
