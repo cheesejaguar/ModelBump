@@ -1,0 +1,29 @@
+[project]
+name = "modelbump"
+version = "0.1.0"
+description = "Dependabot-style updates for hard-coded LLM model slugs"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+# Live listing of first-party Claude model IDs (catalog source "anthropic").
+anthropic = ["anthropic>=0.40"]
+
+[project.scripts]
+modelbump = "modelbump.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/modelbump"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
