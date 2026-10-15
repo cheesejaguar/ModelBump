@@ -29,6 +29,7 @@ from .slugs import update_type
 class Candidate:
     model: Model
     kind: str  # snapshot | minor | major | switch
+    note: str | None = None
 
 
 class NoCandidates(Exception):
@@ -50,8 +51,16 @@ def is_newer(a: Model, b: Model) -> bool:
     return (a.identity.version, not a.identity.prerelease) > (b.identity.version, not b.identity.prerelease)
 
 
-def same_family(model: Model, catalog: Catalog, policy: SameFamily, today: dt.date) -> list[Candidate]:
+def same_family(
+    model: Model,
+    catalog: Catalog,
+    policy: SameFamily,
+    today: dt.date,
+    weights: tuple[float, float] = (3.0, 1.0),
+) -> list[Candidate]:
     out = []
+    too_expensive: list[tuple[Model, float]] = []
+    current_price = model.blended_price(weights)
     for m in catalog.family(model):
         if m is model or m.lifecycle(today) != "active":
             continue
@@ -60,9 +69,24 @@ def same_family(model: Model, catalog: Catalog, policy: SameFamily, today: dt.da
         if not is_newer(m, model):
             continue
         kind = update_type(model.identity, m.identity)
-        if kind in policy.update_types:
-            out.append(Candidate(m, kind))
+        if kind not in policy.update_types:
+            continue
+        price = m.blended_price(weights)
+        if policy.max_price_increase and current_price and price is not None:
+            if price > current_price * policy.max_price_increase:
+                too_expensive.append((m, price / current_price))
+                continue
+        out.append(Candidate(m, kind))
     out.sort(key=lambda c: _newness(c.model), reverse=True)
+    if too_expensive:
+        m, ratio = max(too_expensive, key=lambda mr: _newness(mr[0]))
+        why = (
+            f"{m.display_name} costs {ratio:.1f}x as much as {model.display_name} "
+            f"(same-family.max-price-increase is {policy.max_price_increase:g})"
+        )
+        if not out:
+            raise NoCandidates(why)
+        out = [Candidate(c.model, c.kind, f"Skipped the newer {why}.") if is_newer(m, c.model) else c for c in out]
     return out
 
 

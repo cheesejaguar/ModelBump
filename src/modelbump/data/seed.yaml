@@ -1,6 +1,8 @@
 # Curated model slugs that the live OpenRouter catalog cannot supply:
 # first-party Anthropic ids (aliases and dated snapshots), Amazon Bedrock and
 # Google Vertex AI ids, pinned OpenAI/Google snapshots, and lifecycle status.
+# Vertex AI serves Claude 4.6 and later under the bare first-party id and older
+# models under an @-dated id; both are listed under "vertex".
 #
 # Pricing is USD per million tokens and is only a fallback: live OpenRouter
 # pricing wins when it exists. Status "retired"/"deprecated" marks a model as a
@@ -40,24 +42,28 @@ models:
     pricing: {input: 4.0, output: 20.0}
     native: [claude-opus-5-5]
     bedrock: [anthropic.claude-opus-5-5]
+    vertex: [claude-opus-5-5]
   - vendor: anthropic
     name: Claude Opus 5
     released: 2026-07-24
     pricing: {input: 5.0, output: 25.0}
     native: [claude-opus-5]
     bedrock: [anthropic.claude-opus-5]
+    vertex: [claude-opus-5]
   - vendor: anthropic
     name: Claude Sonnet 5.5
     released: 2026-09-28
     pricing: {input: 2.0, output: 10.0}
     native: [claude-sonnet-5-5]
     bedrock: [anthropic.claude-sonnet-5-5]
+    vertex: [claude-sonnet-5-5]
   - vendor: anthropic
     name: Claude Sonnet 5
     released: 2026-06-30
     pricing: {input: 2.0, output: 10.0}
     native: [claude-sonnet-5]
     bedrock: [anthropic.claude-sonnet-5]
+    vertex: [claude-sonnet-5]
   - vendor: anthropic
     name: Claude Haiku 5.5
     released: 2026-10-07
@@ -72,17 +78,20 @@ models:
     pricing: {input: 5.0, output: 25.0}
     native: [claude-opus-4-8]
     bedrock: [anthropic.claude-opus-4-8]
+    vertex: [claude-opus-4-8]
   - vendor: anthropic
     name: Claude Opus 4.7
     released: 2026-04-16
     pricing: {input: 5.0, output: 25.0}
     native: [claude-opus-4-7]
     bedrock: [anthropic.claude-opus-4-7]
+    vertex: [claude-opus-4-7]
   - vendor: anthropic
     name: Claude Opus 4.6
     released: 2026-02-05
     pricing: {input: 5.0, output: 25.0}
     native: [claude-opus-4-6]
+    vertex: [claude-opus-4-6]
   - vendor: anthropic
     name: Claude Opus 4.5
     released: 2025-11-24
@@ -112,6 +121,7 @@ models:
     released: 2026-02-17
     pricing: {input: 3.0, output: 15.0}
     native: [claude-sonnet-4-6]
+    vertex: [claude-sonnet-4-6]
   - vendor: anthropic
     name: Claude Sonnet 4.5
     released: 2025-09-29
