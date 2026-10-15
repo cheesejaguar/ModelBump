@@ -31,7 +31,7 @@ jobs:
             echo "new=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.version.outputs.new == 'true'
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.3.0
       - if: steps.version.outputs.new == 'true'
         run: uv run pytest -q && uv build
       - if: steps.version.outputs.new == 'true'
