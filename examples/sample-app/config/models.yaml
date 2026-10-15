@@ -1,0 +1,7 @@
+# Batch jobs
+summarizer:
+  provider: openai
+  model: gpt-4o-2024-08-06
+classifier:
+  provider: bedrock
+  model: us.anthropic.claude-sonnet-4-20250514-v1:0

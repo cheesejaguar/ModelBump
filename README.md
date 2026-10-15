@@ -1,6 +1,8 @@
 # ModelBump
 
-Dependabot for hard-coded LLM model slugs. ModelBump finds model IDs in your
+[![CI](https://github.com/cheesejaguar/ModelBump/actions/workflows/ci.yml/badge.svg)](https://github.com/cheesejaguar/ModelBump/actions/workflows/ci.yml)
+
+Dependabot for hard-coded LLM model IDs. ModelBump finds model slugs in your
 code and config (`"claude-opus-5"`, `"anthropic/claude-sonnet-4.5"`,
 `"us.anthropic.claude-sonnet-4-20250514-v1:0"`, `"gpt-4o-2024-08-06"`,
 `"deepseek-ai/DeepSeek-V3.2"`, …) and opens one pull request per update:
@@ -9,6 +11,54 @@ code and config (`"claude-opus-5"`, `"anthropic/claude-sonnet-4.5"`,
 > `src/agent.py:12` `claude-opus-5` → `claude-opus-5-5` ·
 > $5.00/$25.00 → $4.00/$20.00 per 1M tokens · links to the migration notes
 
+**Website and live demo: [cheesejaguar.github.io/ModelBump](https://cheesejaguar.github.io/ModelBump/)**.
+Paste your code and see what would change.
+
+## Add it to a repository
+
+Any of these adds a weekly workflow and a short config.
+
+**Script**: run in the root of your repository. It writes
+`.github/workflows/modelbump.yml` and `.github/modelbump.yml`, stages them, and
+offers to turn on the repository setting that lets Actions open pull requests.
+
+```bash
+curl -fsSL https://cheesejaguar.github.io/ModelBump/install.sh | bash
+```
+
+Options: `--strategy cost-optimized`, `--schedule daily`,
+`--updates minor,major`, `--grouping single`, `--prerelease`, `--yes`,
+`--no-settings`, `--force`. [Read the script](site/install.sh) first if you
+prefer.
+
+**Link**: the [setup page](https://cheesejaguar.github.io/ModelBump/#configure)
+builds both files from your choices and opens GitHub's editor with them filled
+in.
+
+**By hand**: copy [`examples/modelbump-workflow.yml`](examples/modelbump-workflow.yml)
+to `.github/workflows/modelbump.yml`:
+
+```yaml
+name: ModelBump
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  modelbump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cheesejaguar/ModelBump@v0
+```
+
+Then turn on *Settings → Actions → General → Allow GitHub Actions to create
+and approve pull requests*. Without it, GitHub refuses the pull request and the
+run says so.
+
 ## Defaults
 
 These are the choices ModelBump makes when your config doesn't say otherwise:
@@ -16,7 +66,10 @@ These are the choices ModelBump makes when your config doesn't say otherwise:
 - **Strategy: `same-family`.** A model only moves to a newer release of its own
   line (Opus → Opus, Sonnet → Sonnet, `gpt-*-mini` → `gpt-*-mini`,
   `qwen*-max` → `qwen*-max`). Snapshot, minor and major bumps are all allowed;
-  limit them with `update-types`.
+  limit them with `update-types`. A newer release that costs more than 3× as
+  much is skipped (`max-price-increase`).
+- **Only code is rewritten.** Comments, prose, model lists, history and recorded
+  data are left alone; see [What it leaves alone](#what-it-leaves-alone).
 - **The original format is kept.** A slug is replaced with the same model's slug
   on the same host: OpenRouter ids stay OpenRouter ids (dots, `:batch`/`:free`
   variants, `:nitro` routing suffixes), Bedrock versioned ids stay versioned,
@@ -37,58 +90,55 @@ These are the choices ModelBump makes when your config doesn't say otherwise:
   `chinese-open` ecosystem. Open-weight models are only swapped for open-weight
   models.
 
-## Quick start
-
-```bash
-uv tool install git+https://github.com/cheesejaguar/ModelBump
-```
-
-```bash
-modelbump plan --diff
-```
-
-| Command | What it does |
-|---|---|
-| `modelbump scan` | List every model slug found, with its model, host format and lifecycle status |
-| `modelbump plan [--diff] [--json] [--fail-on-updates]` | Show proposed updates without changing anything |
-| `modelbump apply` | Rewrite the slugs in the working tree |
-| `modelbump pr [--dry-run] [--base main]` | Open or refresh one PR per update with `git` and `gh` |
-| `modelbump catalog [--search opus] [--vendor openai]` | Inspect the model catalog |
-| `modelbump init` | Write a commented starter `.github/modelbump.yml` |
-
-Common flags: `--strategy cost-optimized`, `--offline` (cached or bundled data
-only), `--refresh` (bypass the 24-hour cache), `-C path/to/repo`.
-
-`plan --fail-on-updates` exits with status 2 when updates exist, so it also
-works as a CI check.
-
 ## GitHub Action
 
-Copy [`examples/modelbump-workflow.yml`](examples/modelbump-workflow.yml) to
-`.github/workflows/modelbump.yml`:
-
 ```yaml
-on:
-  schedule:
-    - cron: "0 6 * * 1"
-  workflow_dispatch:
-permissions:
-  contents: write
-  pull-requests: write
-jobs:
-  modelbump:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: cheesejaguar/ModelBump@main
-        env:
-          ARTIFICIAL_ANALYSIS_API_KEY: ${{ secrets.ARTIFICIAL_ANALYSIS_API_KEY }}
+- uses: cheesejaguar/ModelBump@v0
+  with:
+    command: pr              # pr | plan | apply
+    path: services/api       # scan a subdirectory (monorepos)
+  env:
+    ARTIFICIAL_ANALYSIS_API_KEY: ${{ secrets.ARTIFICIAL_ANALYSIS_API_KEY }}
 ```
 
-Turn on *Settings → Actions → General → Allow GitHub Actions to create and
-approve pull requests*. PRs opened with the default `GITHUB_TOKEN` don't trigger
-your other workflows; pass a GitHub App or fine-grained token as `github-token`
-if CI should run on them.
+| Input | Default | |
+|---|---|---|
+| `command` | `pr` | `pr` opens or refreshes pull requests, `plan` only reports, `apply` edits the checkout for your own later steps |
+| `path` | `.` | Directory to scan |
+| `config` | | Config file, if not `.github/modelbump.yml` |
+| `strategy` | | Override the strategy for every path |
+| `base` | checked-out branch | Base branch for pull requests |
+| `fail-on-updates` | `false` | With `plan`, fail the step when updates exist |
+| `annotations` | `true` | Annotate changed lines on the workflow run |
+| `github-token` | `github.token` | Pass a GitHub App or fine-grained token if CI should run on ModelBump's PRs (PRs opened with `GITHUB_TOKEN` don't trigger other workflows) |
+
+| Output | |
+|---|---|
+| `updates` | Number of replacements proposed |
+| `pull-requests` | JSON array of PRs created, updated, unchanged or skipped |
+| `report` | Path to the full JSON report |
+
+Every run writes a summary to the job page. Optional environment variables:
+`ARTIFICIAL_ANALYSIS_API_KEY` (benchmark scores), `ANTHROPIC_API_KEY` and
+`OPENAI_API_KEY` (confirm first-party ids). The action runs in its own
+virtualenv on Linux and macOS runners and leaves your job's Python alone.
+
+**As a check** on pull requests instead of a bot:
+
+```yaml
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  models:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cheesejaguar/ModelBump@v0
+        with:
+          command: plan
+          fail-on-updates: true
+```
 
 Pull requests behave like Dependabot's:
 
@@ -103,6 +153,28 @@ Pull requests behave like Dependabot's:
   when Opus 5 → 5.5 opens), and `open-pull-requests-limit` caps how many are
   open at once.
 - Only tracked files are edited.
+
+## Command line
+
+```bash
+uvx --from git+https://github.com/cheesejaguar/ModelBump modelbump plan --diff
+```
+
+or install it: `uv tool install git+https://github.com/cheesejaguar/ModelBump`.
+
+| Command | What it does |
+|---|---|
+| `modelbump scan` | List every model slug found, with its model, host format and lifecycle status |
+| `modelbump plan [--diff] [--json] [--fail-on-updates]` | Show proposed updates without changing anything |
+| `modelbump apply` | Rewrite the slugs in the working tree |
+| `modelbump pr [--dry-run] [--base main]` | Open or refresh one PR per update with `git` and `gh` |
+| `modelbump catalog [--search opus] [--vendor openai]` | Inspect the model catalog |
+| `modelbump init` | Write a commented starter `.github/modelbump.yml` |
+
+Common flags: `--strategy cost-optimized`, `--offline` (cached or bundled data
+only), `--refresh` (bypass the 24-hour cache), `-C path/to/repo`. `plan`,
+`apply` and `pr` also take `--summary FILE` (Markdown), `--report-json FILE`
+and `--github-annotations`.
 
 ## Strategies
 
@@ -119,6 +191,11 @@ wins.
 | `snapshot` | `gpt-4o-2024-08-06` → `gpt-4o-2024-11-20` |
 | `minor` | `claude-opus-5` → `claude-opus-5-5` |
 | `major` | `claude-opus-4-8` → `claude-opus-5-5` |
+
+`max-price-increase` (default `3`) skips a newer release whose blended price is
+more than that multiple of the current one, so `gpt-3.5-turbo` doesn't become
+`gpt-4-turbo` at about 20× the cost. When a pricier release is skipped in favour
+of an older one, the PR says so. Set it to `null` to turn the check off.
 
 ### `cost-optimized`
 
@@ -153,6 +230,31 @@ catalog:
 
 Your scores take precedence over Artificial Analysis.
 
+## What it leaves alone
+
+ModelBump was run over aider, LiteLLM, the Vercel AI SDK, the OpenAI Agents SDK,
+simonw/llm and Anthropic's cookbooks before release; these rules come from what
+it would otherwise have broken there.
+
+| Left alone | Why | Opt in |
+|---|---|---|
+| Comments (`# was gpt-4o before March`) | They describe history or intent | `detection: {comments: true}` |
+| Markdown and HTML prose, URLs, notebook Markdown cells and outputs | Same; Markdown code blocks and inline code are still updated | `detection: {prose: true}` |
+| Files naming 3+ versions of one model line or 8+ models, slugs used as table keys, and bumps whose target the file already names | They are registries, price tables, leaderboards and test matrices | `detection: {model-lists: true}` |
+| Changelogs, history and release notes, blog posts, cassettes, fixtures, snapshots, `.jsonl`/`.csv`/`.svg`, files over 512 KB | Recorded data has to match what was recorded | `exclude` in your config is additive; these are always skipped |
+| Regular expressions (`^gpt-5\.4`) | Not a model choice | – |
+
+Conditions such as `if model == "claude-opus-5"` are still updated, and the PR
+lists them so you can check the logic. Pin a single line with a comment:
+
+```python
+MODEL = "gpt-4o-2024-08-06"  # modelbump: ignore
+# modelbump: ignore-next-line
+EVAL_BASELINE = "claude-opus-4-5"
+```
+
+The config file and `scores-file` are never rewritten.
+
 ## Configuration
 
 `.github/modelbump.yml` (also `.github/modelbump.yaml`, `.modelbump.yml`):
@@ -164,6 +266,7 @@ strategy: same-family
 same-family:
   update-types: [snapshot, minor, major]
   allow-prerelease: false
+  max-price-increase: 3
 
 cost-optimized:
   scope: ecosystem              # or vendor
@@ -182,14 +285,19 @@ updates:                        # optional per-path rules, first match wins
     same-family:
       update-types: [snapshot, minor]
 
-exclude: ["**/CHANGELOG*", "docs/archive/**"]
+exclude: ["docs/archive/**"]
+
+detection:
+  comments: false
+  prose: false
+  model-lists: false
 
 ignore:
   - model: "gpt-4o*"            # glob on the slug found in your code
   - model: "claude-*"
     update-types: [major]
   - target: "*-preview*"        # glob on the proposed replacement
-  - paths: ["tests/fixtures/**"]
+  - paths: ["tests/e2e/**"]
 
 ecosystems:                     # replaces the default grouping for these vendors
   chinese-open: [deepseek, qwen, moonshotai, z-ai, minimax]
@@ -217,23 +325,13 @@ pull-requests:
   open-pull-requests-limit: 5
 ```
 
-Pin a single line with a comment:
-
-```python
-MODEL = "gpt-4o-2024-08-06"  # modelbump: ignore
-# modelbump: ignore-next-line
-EVAL_BASELINE = "claude-opus-4-5"
-```
-
-The config file and `scores-file` are never rewritten.
-
 ## The catalog
 
 | Source | Key | Provides |
 |---|---|---|
 | Bundled seed (`src/modelbump/data/seed.yaml`) | – | First-party Claude ids and dated snapshots, Bedrock and Vertex AI ids, pinned OpenAI snapshots, deprecations and retirements |
-| OpenRouter `/api/v1/models` | – | Every model and its prices, release date, context window, modalities, Hugging Face id and expiry date; a snapshot is bundled for offline use |
-| Anthropic Models API | `ANTHROPIC_API_KEY` + `pip install "modelbump[anthropic]"` | Confirms first-party Claude ids, picks up new ones |
+| OpenRouter `/api/v1/models` | – | Every model and its prices, release date, context window, modalities, Hugging Face id and expiry date; a snapshot is bundled for offline use and refreshed weekly |
+| Anthropic Models API | `ANTHROPIC_API_KEY` + `pip install "modelbump[anthropic]"` (the action includes it) | Confirms first-party Claude ids, picks up new ones |
 | OpenAI `/v1/models` | `OPENAI_API_KEY` | Confirms inferred first-party OpenAI ids |
 | Artificial Analysis | `ARTIFICIAL_ANALYSIS_API_KEY` | Benchmark scores |
 
@@ -267,10 +365,19 @@ Separator-free ids such as `o3` only match inside quotes.
   (`gpt-5-mini` → `gpt-5.6-luna`), ModelBump won't connect them in
   `same-family` mode; `cost-optimized` can still find the new line.
 - Only vendors in `src/modelbump/vendors.py` are recognized.
+- Comment detection is line-based: a `#` or `//` before a slug marks it as a
+  comment, so `"#1 pick: gpt-5"` inside a string is treated as a comment and
+  left alone.
 
 ## Development
 
 ```bash
 uv sync
 uv run pytest
+uv run python scripts/build_site.py --out _site   # build the website locally
 ```
+
+Releases are automatic: bump `version` in `pyproject.toml` and merge to `main`.
+The release workflow tags `vX.Y.Z`, attaches the wheel, and moves the major tag
+(`v0`) that workflows reference. The website rebuilds on every push to `main`
+and daily with fresh model data.

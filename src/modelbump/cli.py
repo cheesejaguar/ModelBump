@@ -16,7 +16,7 @@ from .config import Config, ConfigError, load_config
 from .editor import StaleFileError, apply_changes, render_diff
 from .github import GitHubError, open_pull_requests
 from .planner import Plan, build_plan
-from .report import catalog_text, model_json, plan_json, plan_text, scan_text
+from .report import annotations, catalog_text, model_json, plan_json, plan_text, scan_text, summary_markdown
 from .scanner import scan
 
 log = logging.getLogger("modelbump")
@@ -32,6 +32,29 @@ def _common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--refresh", action="store_true", help="ignore cached catalog data")
     p.add_argument("--today", type=dt.date.fromisoformat, help=argparse.SUPPRESS)
     p.add_argument("-v", "--verbose", action="store_true")
+
+
+def _outputs(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--summary", type=Path, metavar="FILE", help="append a Markdown report (e.g. $GITHUB_STEP_SUMMARY)")
+    p.add_argument("--report-json", type=Path, metavar="FILE", help="write a machine-readable report")
+    p.add_argument(
+        "--github-annotations", action="store_true", help="print GitHub Actions annotations for changed lines"
+    )
+
+
+def _write_outputs(args, plan: Plan, results: list | None = None) -> None:
+    if args.github_annotations:
+        text = annotations(plan)
+        if text:
+            print(text)
+    if args.summary:
+        with args.summary.open("a", encoding="utf-8") as f:
+            f.write(summary_markdown(plan, results))
+    if args.report_json:
+        report = plan_json(plan)
+        if results is not None:
+            report["pull_requests"] = [vars(r) for r in results]
+        args.report_json.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -50,15 +73,18 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.add_argument("--diff", action="store_true", help="print a unified diff of the proposed edits")
     p.add_argument("--fail-on-updates", action="store_true", help="exit with status 2 when updates are available")
+    _outputs(p)
 
     p = sub.add_parser("apply", help="rewrite files in the working tree")
     _common(p)
     p.add_argument("--diff", action="store_true", help="also print the diff")
+    _outputs(p)
 
     p = sub.add_parser("pr", help="open or refresh one pull request per update (needs git and gh)")
     _common(p)
     p.add_argument("--base", help="base branch (default: the checked-out branch)")
     p.add_argument("--dry-run", action="store_true", help="list the pull requests without pushing")
+    _outputs(p)
 
     p = sub.add_parser("catalog", help="show the model catalog")
     _common(p)
@@ -121,12 +147,14 @@ def cmd_plan(args) -> int:
         if args.diff and plan.changes:
             print()
             print(render_diff(root, plan.changes), end="")
+    _write_outputs(args, plan)
     return 2 if args.fail_on_updates and plan.changes else 0
 
 
 def cmd_apply(args) -> int:
     root, config, catalog, plan = _plan(args)
     print(plan_text(plan))
+    _write_outputs(args, plan)
     if not plan.changes:
         return 0
     if args.diff:
@@ -149,6 +177,7 @@ def cmd_pr(args) -> int:
             extra = f"  {r.url}" if r.url else ""
             detail = f"  ({r.detail})" if r.detail else ""
             print(f"{r.action:<13} {r.branch}  {r.title}{extra}{detail}")
+    _write_outputs(args, plan, results)
     return 0
 
 

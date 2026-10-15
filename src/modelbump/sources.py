@@ -83,6 +83,30 @@ def cached_fetch(
     return data, "live"
 
 
+def slim_openrouter(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only the fields ModelBump reads (for the bundled snapshot)."""
+    out = []
+    for m in records:
+        arch = m.get("architecture") or {}
+        pricing = m.get("pricing") or {}
+        out.append(
+            {
+                "id": m["id"],
+                "name": m.get("name"),
+                "created": m.get("created"),
+                "hugging_face_id": m.get("hugging_face_id") or None,
+                "context_length": m.get("context_length"),
+                "pricing": {k: pricing.get(k) for k in ("prompt", "completion")},
+                "architecture": {
+                    "input_modalities": arch.get("input_modalities"),
+                    "output_modalities": arch.get("output_modalities"),
+                },
+                "expiration_date": m.get("expiration_date"),
+            }
+        )
+    return sorted(out, key=lambda m: m["id"])
+
+
 def bundled_openrouter() -> dict[str, Any]:
     text = resources.files("modelbump").joinpath("data/openrouter_snapshot.json").read_text(encoding="utf-8")
     return json.loads(text)

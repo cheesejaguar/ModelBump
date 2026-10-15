@@ -16,9 +16,9 @@ jobs:
   modelbump:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: cheesejaguar/ModelBump@main
+      - uses: cheesejaguar/ModelBump@v0
         env:
           # All optional. Without them ModelBump still works from OpenRouter's
           # public catalog, but cost-optimized mode needs benchmark scores.

@@ -218,7 +218,16 @@ def open_pull_requests(
                     cmd += ["--reviewer", ",".join(prefs.reviewers)]
                 if prefs.assignees:
                     cmd += ["--assignee", ",".join(prefs.assignees)]
-                url = _run(cmd, root, input=body).strip().splitlines()[-1]
+                try:
+                    url = _run(cmd, root, input=body).strip().splitlines()[-1]
+                except GitHubError as e:
+                    if "not permitted to create or approve pull requests" in str(e):
+                        raise GitHubError(
+                            "GitHub Actions may not open pull requests in this repository. Enable Settings -> "
+                            "Actions -> General -> 'Allow GitHub Actions to create and approve pull requests', "
+                            "or pass a GitHub App / personal access token as the action's github-token."
+                        ) from e
+                    raise
                 result = PullRequestResult(branch, title, "created", url)
                 open_count += 1
             results.append(result)
