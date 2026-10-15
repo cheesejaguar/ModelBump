@@ -1,9 +1,10 @@
 """Open Dependabot-style pull requests with git and the GitHub CLI (``gh``).
 
 One branch per update (or one for everything with ``grouping: single``).
-Branches are rebuilt from the base branch and force-pushed on every run, an
-existing PR for the branch gets its title and body refreshed, and an open PR
-for an older target of the same model is closed as superseded.
+A branch is rebuilt from the base branch and pushed only when its edits
+changed; an existing PR then gets its title and body refreshed, and an open PR
+for an older target of the same model is closed as superseded. Branches other
+people committed to, and updates whose PR was closed, are left alone.
 """
 
 from __future__ import annotations
@@ -39,11 +40,30 @@ class PullRequestResult:
     detail: str | None = None
 
 
-def _run(cmd: list[str], cwd: Path, *, input: str | None = None) -> str:
+NETWORK_TIMEOUT = 180  # seconds, for commands that talk to GitHub
+
+
+def _run(cmd: list[str], cwd: Path, *, input: str | None = None, timeout: float | None = None) -> str:
+    network = cmd[0] != "git" or cmd[1] in ("push", "fetch", "ls-remote")
     try:
-        proc = subprocess.run(cmd, cwd=cwd, input=input, capture_output=True, text=True)
+        proc = subprocess.run(
+            cmd,
+            cwd=cwd,
+            input=input,
+            stdin=None if input is not None else subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            # Never wait for a password prompt: fail with a message instead.
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GH_PROMPT_DISABLED": "1"},
+            timeout=timeout or (NETWORK_TIMEOUT if network else None),
+        )
     except FileNotFoundError as e:
         raise GitHubError(f"{cmd[0]} is not installed or not on PATH") from e
+    except subprocess.TimeoutExpired as e:
+        raise GitHubError(
+            f"`{' '.join(cmd[:3])}` did not finish within {e.timeout:.0f}s; check that git and gh can reach "
+            "GitHub without prompting (credentials, SSH agent approval)"
+        ) from e
     if proc.returncode != 0:
         raise GitHubError(f"`{' '.join(cmd[:3])}` failed: {proc.stderr.strip() or proc.stdout.strip()}")
     return proc.stdout
@@ -53,12 +73,14 @@ def _gh() -> str:
     return os.environ.get("MODELBUMP_GH", "gh")
 
 
-def _commit_message(group: Group, config: Config) -> str:
+def _commit_message(group: Group, config: Config, path_prefix: str = "") -> str:
     prefix = config.pull_requests.commit_message_prefix.strip()
     title = group.title()
     lines = [f"{prefix} {title[0].lower()}{title[1:]}" if prefix else title, ""]
     for c in group.changes:
-        lines.append(f"- {c.occurrence.path}:{c.occurrence.line}: {c.from_slug.text} -> {c.to_slug.text}")
+        lines.append(
+            f"- {path_prefix}{c.occurrence.path}:{c.occurrence.line}: {c.from_slug.text} -> {c.to_slug.text}"
+        )
     lines += ["", f"{COMMIT_TRAILER}: {group.from_model.key} -> {group.to_model.key}"]
     return "\n".join(lines) + "\n"
 
@@ -95,11 +117,22 @@ def _patch_id(root: Path, a: str, b: str) -> str:
     return out.split()[0] if out.strip() else ""
 
 
-def _remote_branch(root: Path, branch: str, base_sha: str) -> _RemoteBranch | None:
-    if not _run(["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}"], root).strip():
+def _remote_branches(root: Path, prefix: str) -> dict[str, str]:
+    """All ModelBump branches on origin (name -> tip), fetched in one go."""
+    out = _run(["git", "ls-remote", "--heads", "origin", f"refs/heads/{prefix}/*"], root)
+    tips = {}
+    for line in out.splitlines():
+        sha, _, ref = line.partition("\t")
+        if ref.startswith("refs/heads/"):
+            tips[ref[len("refs/heads/") :]] = sha
+    if tips:
+        _run(["git", "fetch", "-q", "--no-tags", "origin", *(f"refs/heads/{b}" for b in tips)], root)
+    return tips
+
+
+def _remote_branch(root: Path, tip: str | None, base_sha: str) -> _RemoteBranch | None:
+    if tip is None:
         return None
-    _run(["git", "fetch", "-q", "--no-tags", "origin", f"refs/heads/{branch}"], root)
-    tip = _run(["git", "rev-parse", "FETCH_HEAD"], root).strip()
     try:
         merge_base = _run(["git", "merge-base", base_sha, tip], root).strip()
     except GitHubError:
@@ -147,6 +180,8 @@ def open_pull_requests(
             root,
         )
     )
+    remote_tips = {} if dry_run else _remote_branches(root, prefs.branch_prefix)
+    path_prefix = _run(["git", "rev-parse", "--show-prefix"], root).strip()
     mine = [p for p in prs if p["headRefName"].startswith(prefs.branch_prefix + "/")]
     ours = {p["headRefName"]: p for p in mine if p["state"].upper() == "OPEN"}
     closed = {p["headRefName"]: p for p in mine if p["state"].upper() == "CLOSED"}
@@ -179,7 +214,7 @@ def open_pull_requests(
                 results.append(PullRequestResult(branch, title, action, existing["url"] if existing else None))
                 continue
 
-            remote = _remote_branch(root, branch, base_sha)
+            remote = _remote_branch(root, remote_tips.get(branch), base_sha)
             if remote and remote.foreign:
                 # Like Dependabot: once someone else pushes to the branch, hands off.
                 results.append(
@@ -192,7 +227,7 @@ def open_pull_requests(
             _run(["git", "checkout", "-q", "-B", branch, base_sha], root)
             files = apply_changes(root, g.changes)
             _run(["git", "add", "--", *files], root)
-            _run(["git", "commit", "-q", "-F", "-"], root, input=_commit_message(g, config))
+            _run(["git", "commit", "-q", "-F", "-"], root, input=_commit_message(g, config, path_prefix))
             # Same edits as the pushed branch (even if the base moved elsewhere):
             # don't force-push, so reviewers and CI aren't disturbed. Edits whose
             # context changed on the base produce a different patch and rebase.
@@ -204,7 +239,7 @@ def open_pull_requests(
                 lease = f"refs/heads/{branch}:{remote.tip if remote else ''}"
                 _run(["git", "push", "-q", f"--force-with-lease={lease}", "origin", f"{branch}:{branch}"], root)
 
-            body = pr_body(g, catalog, config, today)
+            body = pr_body(g, catalog, config, today, path_prefix=path_prefix)
             if len(body) > MAX_BODY:
                 body = body[:MAX_BODY] + "\n\n…(truncated)"
             if existing:

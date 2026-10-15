@@ -302,7 +302,9 @@ def _intro(g: Group) -> str:
     )
 
 
-def pr_body(group: Group, catalog: Catalog, config: Config, today: dt.date) -> str:
+def pr_body(group: Group, catalog: Catalog, config: Config, today: dt.date, *, path_prefix: str = "") -> str:
+    """Markdown for a pull request. ``path_prefix`` makes locations
+    repository-relative when ModelBump scanned a subdirectory."""
     parts: list[str] = []
     subgroups = _subgroups(group)
     if len(subgroups) > 1:
@@ -320,7 +322,7 @@ def pr_body(group: Group, catalog: Catalog, config: Config, today: dt.date) -> s
         for c in g.changes:
             o = c.occurrence
             parts.append(
-                f"| `{o.path}:{o.line}` | `{c.from_slug.text}` | `{c.to_slug.text}` "
+                f"| `{path_prefix}{o.path}:{o.line}` | `{c.from_slug.text}` | `{c.to_slug.text}` "
                 f"| {STYLE_LABELS.get(c.from_slug.style, c.from_slug.style)} |"
             )
         parts.append("")
