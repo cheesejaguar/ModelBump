@@ -3,7 +3,7 @@
 import anthropic
 from openai import OpenAI
 
-PLANNER_MODEL = "claude-opus-5"
+PLANNER_MODEL = "claude-opus-5-5"
 DRAFTER_MODEL = "gpt-5-mini"
 
 claude = anthropic.Anthropic()
