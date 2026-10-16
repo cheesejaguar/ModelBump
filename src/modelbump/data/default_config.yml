@@ -12,6 +12,7 @@ same-family:
   # major:    claude-opus-4-8 -> claude-opus-5-5
   update-types: [snapshot, minor, major]
   allow-prerelease: false        # preview / exp / beta models
+  max-price-increase: 3          # skip a newer release that costs over 3x as much
 
 cost-optimized:
   scope: ecosystem               # or "vendor" to stay with the same lab
@@ -31,9 +32,15 @@ cost-optimized:
 #     same-family:
 #       update-types: [snapshot, minor]
 
-exclude:
-  - "**/*.lock"
-  - "**/CHANGELOG*"
+# Changelogs, fixtures, cassettes, snapshots and data files are always skipped.
+exclude: []
+#  - "docs/archive/**"
+
+# Kinds of mentions that are left alone unless switched on.
+detection:
+  comments: false                # "# we used gpt-4o here"
+  prose: false                   # Markdown/HTML text outside code
+  model-lists: false             # registries, price tables, docs listing many models
 
 # ignore:
 #   - model: "gpt-4o*"               # never touch these slugs

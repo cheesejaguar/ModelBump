@@ -78,3 +78,9 @@ def test_config_and_scores_files_are_never_scanned(catalog, repo):
     (repo / "a.py").write_text('"claude-opus-5"\n')
     config = parse_config({"catalog": {"scores-file": "./scores.yml"}})
     assert [o.path for o in scan(repo, catalog, config)] == ["a.py"]
+
+
+def test_escaped_strings_still_match(catalog):
+    # JSON-escaped source, as in notebooks and serialized configs
+    assert found(catalog, r'"create(model=\"claude-opus-5\")\n",') == ["claude-opus-5"]
+    assert found(catalog, r'"model=claude-opus-5\n"') == ["claude-opus-5"]

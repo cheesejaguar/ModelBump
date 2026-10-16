@@ -15,8 +15,40 @@ jobs:
       matrix:
         python-version: ["3.10", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv run pytest -q
+
+  # Runs this repository's action the way users do, against examples/sample-app.
+  action:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - id: modelbump
+        uses: ./
+        with:
+          command: plan
+          path: examples/sample-app
+      - name: Check outputs
+        env:
+          UPDATES: ${{ steps.modelbump.outputs.updates }}
+          REPORT: ${{ steps.modelbump.outputs.report }}
+        run: |
+          echo "updates=$UPDATES report=$REPORT"
+          test "$UPDATES" -ge 5
+          test -s "$REPORT"
+      - name: Install script writes a working setup
+        run: |
+          tmp=$(mktemp -d) && cd "$tmp" && git init -q
+          bash "$GITHUB_WORKSPACE/site/install.sh" --yes --no-settings
+          test -f .github/workflows/modelbump.yml
+          test -f .github/modelbump.yml
+          # PyYAML is in the virtualenv the action installed ModelBump into
+          "$(dirname "$MODELBUMP_BIN")/python" -c "import yaml,sys; [yaml.safe_load(open(p)) for p in sys.argv[1:]]" \
+            .github/workflows/modelbump.yml .github/modelbump.yml
+          "$MODELBUMP_BIN" plan --offline

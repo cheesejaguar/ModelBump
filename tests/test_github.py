@@ -23,6 +23,10 @@ FAKE_GH = textwrap.dedent(
         out = json.dumps(state["prs"])
     elif args[:2] == ["label", "list"]:
         out = json.dumps([{{"name": "dependencies"}}])
+    elif args[:2] == ["label", "create"] and os.environ.get("FAKE_GH_LABEL_FAIL"):
+        json.dump(state, open(state_path, "w"))
+        sys.stderr.write("HTTP 403: Resource not accessible by integration")
+        sys.exit(1)
     elif args[:2] == ["pr", "create"]:
         n = 100 + len(state["prs"])
         head = args[args.index("--head") + 1]
@@ -200,3 +204,29 @@ def test_refuses_dirty_tree(project, catalog, today, gh):
     (project / "app.py").write_text('OPUS = "claude-opus-5"\n# wip\n')
     with pytest.raises(GitHubError, match="uncommitted"):
         run_prs(project, catalog, today)
+
+
+def test_subdirectory_paths_are_repo_relative(project, catalog, today, gh):
+    (project / "svc").mkdir()
+    (project / "svc" / "api.py").write_text('M = "claude-sonnet-5"\n')
+    git(project, "add", ".")
+    git(project, "commit", "-q", "-m", "svc")
+    git(project, "push", "-q", "origin", "main")
+    config = parse_config({})
+    sub = project / "svc"
+    plan = build_plan(scan(sub, catalog, config), catalog, config, today)
+    (result,) = open_pull_requests(plan, sub, catalog, config, today)
+    body = gh.read()["prs"][0]["body"]
+    assert "| `svc/api.py:1` |" in body
+    log = git(project, "log", "-1", "--format=%B", f"origin/{result.branch}")
+    assert "- svc/api.py:1: claude-sonnet-5 -> claude-sonnet-5-5" in log
+
+
+def test_missing_label_permission_still_opens_the_pr(project, catalog, today, gh, monkeypatch):
+    monkeypatch.setenv("FAKE_GH_LABEL_FAIL", "1")
+    results = run_prs(project, catalog, today)
+    assert [r.action for r in results] == ["created", "created"]
+    assert "issues: write" in results[0].detail
+    create = gh.calls("pr", "create")[0]
+    assert create[create.index("--label") + 1] == "dependencies"  # existing label still applied
+    assert "llm-models" not in create

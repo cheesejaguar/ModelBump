@@ -31,6 +31,9 @@ class ConfigError(ValueError):
 class SameFamily:
     update_types: tuple[str, ...] = UPDATE_TYPES
     allow_prerelease: bool = False
+    # Skip a newer model whose blended price is more than this multiple of the
+    # current one (gpt-3.5-turbo -> gpt-4-turbo is ~20x). None disables.
+    max_price_increase: float | None = 3.0
 
 
 @dataclass(frozen=True)
@@ -101,9 +104,19 @@ class PullRequests:
 
 
 @dataclass(frozen=True)
+class Detection:
+    """Which kinds of mentions get rewritten. Code is always included."""
+
+    comments: bool = False  # "# we use gpt-4 here"
+    prose: bool = False  # Markdown/HTML text outside code blocks and inline code
+    model_lists: bool = False  # registries, price tables, docs listing many models
+
+
+@dataclass(frozen=True)
 class Config:
     rules: tuple[Rule, ...] = (Rule(),)
     exclude: tuple[str, ...] = ()
+    detection: Detection = Detection()
     ignore: tuple[IgnoreRule, ...] = ()
     ecosystems: dict[str, list[str]] = field(default_factory=default_ecosystems)
     catalog: CatalogConfig = CatalogConfig()
@@ -218,7 +231,7 @@ def _choice(v: Any, choices: tuple[str, ...], ctx: str) -> str:
 
 def _same_family(raw: Any, base: SameFamily, ctx: str) -> SameFamily:
     d = _norm(raw, ctx)
-    _check_keys(d, {"update-types", "allow-prerelease"}, ctx)
+    _check_keys(d, {"update-types", "allow-prerelease", "max-price-increase"}, ctx)
     out = base
     if "update-types" in d:
         types = _str_list(d["update-types"], f"{ctx}.update-types")
@@ -227,6 +240,9 @@ def _same_family(raw: Any, base: SameFamily, ctx: str) -> SameFamily:
         out = replace(out, update_types=types)
     if "allow-prerelease" in d:
         out = replace(out, allow_prerelease=_bool(d["allow-prerelease"], f"{ctx}.allow-prerelease"))
+    if "max-price-increase" in d:
+        v = d["max-price-increase"]
+        out = replace(out, max_price_increase=None if v is None else _number(v, f"{ctx}.max-price-increase", 1))
     return out
 
 
@@ -262,11 +278,21 @@ def _cost(raw: Any, base: CostOptimized, ctx: str) -> CostOptimized:
     return out
 
 
+def _detection(raw: Any) -> Detection:
+    d = _norm(raw, "detection")
+    _check_keys(d, {"comments", "prose", "model-lists"}, "detection")
+    return Detection(
+        comments=_bool(d.get("comments", False), "detection.comments"),
+        prose=_bool(d.get("prose", False), "detection.prose"),
+        model_lists=_bool(d.get("model-lists", False), "detection.model-lists"),
+    )
+
+
 def parse_config(raw: Any, path: Path | None = None) -> Config:
     d = _norm(raw, "config")
     top_keys = {
         "version", "strategy", "same-family", "cost-optimized", "updates", "exclude",
-        "ignore", "ecosystems", "catalog", "pull-requests",
+        "ignore", "ecosystems", "catalog", "pull-requests", "detection",
     }  # fmt: skip
     _check_keys(d, top_keys, "config")
     if d.get("version", 1) != 1:
@@ -380,6 +406,7 @@ def parse_config(raw: Any, path: Path | None = None) -> Config:
     return Config(
         rules=tuple(rules),
         exclude=_str_list(d.get("exclude"), "exclude"),
+        detection=_detection(d.get("detection")),
         ignore=tuple(ignores),
         ecosystems=ecosystems,
         catalog=catalog,

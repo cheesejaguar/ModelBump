@@ -71,13 +71,97 @@ def plan_text(plan: Plan) -> str:
         lines.append("")
         lines.append("Notes:")
         lines.extend(f"  {c.occurrence.path}:{c.occurrence.line}  {n}" for c, n in notes)
-    for level, title in (("warning", "Warnings"), ("info", "Skipped")):
-        items = [f for f in plan.findings if f.level == level]
-        if items:
-            lines.append("")
-            lines.append(f"{title}:")
-            lines.extend(f"  {f.occurrence.path}:{f.occurrence.line}  {f.occurrence.text}: {f.message}" for f in items)
+    warnings = [f for f in plan.findings if f.level == "warning"]
+    if warnings:
+        lines.append("")
+        lines.append("Warnings:")
+        lines.extend(f"  {f.occurrence.path}:{f.occurrence.line}  {f.occurrence.text}: {f.message}" for f in warnings)
+    skipped = _grouped_skips(plan)
+    if skipped:
+        lines.append("")
+        lines.append("Not changed:")
+        for message, items in skipped[:15]:
+            where = ", ".join(f"{f.occurrence.path}:{f.occurrence.line}" for f in items[:3])
+            more = f" and {len(items) - 3} more" if len(items) > 3 else ""
+            lines.append(f"  {len(items):>4} x {message}  ({where}{more})")
+        if len(skipped) > 15:
+            lines.append(f"  ... {len(skipped) - 15} more reason(s); use --json for everything")
     return "\n".join(lines)
+
+
+def _grouped_skips(plan: Plan) -> list[tuple[str, list]]:
+    groups: dict[str, list] = {}
+    for f in plan.findings:
+        if f.level == "info":
+            # "file names 9 different models; ..." -> one bucket per reason
+            key = f.message
+            for prefix in ("file names ", "in a comment", "in prose", "used as a key", "file already references"):
+                if f.message.startswith(prefix):
+                    key = prefix.strip() if prefix != "file names " else "file is a model list"
+                    break
+            groups.setdefault(key, []).append(f)
+    return sorted(groups.items(), key=lambda kv: -len(kv[1]))
+
+
+def annotations(plan: Plan) -> str:
+    """GitHub Actions workflow commands: inline notes on the changed lines."""
+
+    def esc(v: str, prop: bool = False) -> str:
+        v = v.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        return v.replace(":", "%3A").replace(",", "%2C") if prop else v
+
+    out = []
+    for c in plan.changes:
+        o = c.occurrence
+        msg = f"{c.from_slug.text} can be bumped to {c.to_slug.text} ({c.kind}, {c.strategy})"
+        out.append(f"::notice file={esc(o.path, True)},line={o.line},title={esc('ModelBump', True)}::{esc(msg)}")
+    for f in plan.findings:
+        if f.level == "warning":
+            o = f.occurrence
+            out.append(f"::warning file={esc(o.path, True)},line={o.line},title=ModelBump::{esc(f.message)}")
+    return "\n".join(out)
+
+
+def summary_markdown(plan: Plan, results: list | None = None) -> str:
+    """Markdown for $GITHUB_STEP_SUMMARY."""
+    files = len({o.path for o in plan.occurrences})
+    parts = [
+        "## ModelBump",
+        "",
+        f"{len(plan.occurrences)} model reference(s) in {files} file(s), "
+        f"**{len(plan.changes)} update(s)** proposed.",
+        "",
+    ]
+    groups = plan.groups()
+    if groups:
+        parts += ["| Update | Kind | References | Files |", "|---|---|---|---|"]
+        for g in groups:
+            parts.append(
+                f"| {g.title()} | {g.kind} | {len(g.changes)} | "
+                + ", ".join(f"`{f}`" for f in g.files[:4])
+                + (f" +{len(g.files) - 4}" if len(g.files) > 4 else "")
+                + " |"
+            )
+        parts.append("")
+    warnings = [f for f in plan.findings if f.level == "warning"]
+    if warnings:
+        parts.append("**Warnings**")
+        parts.append("")
+        parts += [f"- `{f.occurrence.path}:{f.occurrence.line}` `{f.occurrence.text}`: {f.message}" for f in warnings]
+        parts.append("")
+    if results:
+        parts += ["**Pull requests**", "", "| Result | Branch | Title |", "|---|---|---|"]
+        for r in results:
+            link = f"[{r.action}]({r.url})" if r.url else r.action
+            detail = f" ({r.detail})" if r.detail else ""
+            parts.append(f"| {link}{detail} | `{r.branch}` | {r.title} |")
+        parts.append("")
+    skipped = _grouped_skips(plan)
+    if skipped:
+        parts.append("<details><summary>Not changed</summary>\n")
+        parts += [f"- {len(items)} x {message}" for message, items in skipped]
+        parts.append("\n</details>\n")
+    return "\n".join(parts) + "\n"
 
 
 def catalog_text(models: list[Model], today: dt.date) -> str:
@@ -218,7 +302,9 @@ def _intro(g: Group) -> str:
     )
 
 
-def pr_body(group: Group, catalog: Catalog, config: Config, today: dt.date) -> str:
+def pr_body(group: Group, catalog: Catalog, config: Config, today: dt.date, *, path_prefix: str = "") -> str:
+    """Markdown for a pull request. ``path_prefix`` makes locations
+    repository-relative when ModelBump scanned a subdirectory."""
     parts: list[str] = []
     subgroups = _subgroups(group)
     if len(subgroups) > 1:
@@ -236,7 +322,7 @@ def pr_body(group: Group, catalog: Catalog, config: Config, today: dt.date) -> s
         for c in g.changes:
             o = c.occurrence
             parts.append(
-                f"| `{o.path}:{o.line}` | `{c.from_slug.text}` | `{c.to_slug.text}` "
+                f"| `{path_prefix}{o.path}:{o.line}` | `{c.from_slug.text}` | `{c.to_slug.text}` "
                 f"| {STYLE_LABELS.get(c.from_slug.style, c.from_slug.style)} |"
             )
         parts.append("")

@@ -12,10 +12,6 @@ from .scanner import Occurrence
 from .strategies import Candidate, NoCandidates, cost_optimized, same_family
 from .vendors import VENDORS
 
-# Where a slug may be rewritten in another style when the target has no slug
-# in the original one. Vertex AI serves current Claude models under the bare
-# first-party id instead of an @-dated one.
-STYLE_FALLBACKS = {"vertex": ("native",)}
 
 
 @dataclass(frozen=True)
@@ -139,7 +135,7 @@ def savings(old: Model, new: Model, weights: tuple[float, float]) -> float | Non
 
 def render(from_slug: Slug, to_model: Model) -> tuple[Slug | None, list[str]]:
     """Pick the slug for ``to_model`` written the way ``from_slug`` was written."""
-    for style in (from_slug.style, *STYLE_FALLBACKS.get(from_slug.style, ())):
+    for style in (from_slug.style,):
         options = to_model.slugs_for(style, from_slug.modifier)
         if not options:
             continue
@@ -149,7 +145,7 @@ def render(from_slug: Slug, to_model: Model) -> tuple[Slug | None, list[str]]:
         floating = [s for s in options if not s.pinned]
         if from_slug.pinned:
             choice = pinned[-1] if pinned else floating[-1]
-            if not pinned and style == from_slug.style:
+            if not pinned:
                 notes.append(
                     f"{to_model.display_name} has no dated {label} id, so the pinned `{from_slug.text}` "
                     f"becomes the floating `{choice.text}`."
@@ -158,11 +154,6 @@ def render(from_slug: Slug, to_model: Model) -> tuple[Slug | None, list[str]]:
             choice = floating[-1] if floating else pinned[-1]
             if not floating:
                 notes.append(f"{to_model.display_name} has no floating {label} id; pinned to `{choice.text}`.")
-        if style != from_slug.style:
-            notes.append(
-                f"{to_model.display_name} has no {STYLE_LABELS.get(from_slug.style)} snapshot id; "
-                f"it is served there under the first-party id `{choice.text}`."
-            )
         if choice.derived:
             vendor = VENDORS[to_model.vendor].name
             notes.append(
@@ -189,7 +180,7 @@ def lifecycle_text(model: Model, today: dt.date) -> str:
 def _candidates(model: Model, rule: Rule, catalog: Catalog, config: Config, today: dt.date) -> list[Candidate]:
     if rule.strategy == "cost-optimized":
         return cost_optimized(model, catalog, rule.cost_optimized, config, today)
-    return same_family(model, catalog, rule.same_family, today)
+    return same_family(model, catalog, rule.same_family, today, rule.cost_optimized.price_weights)
 
 
 def _snapshot_bump(model: Model, slug: Slug) -> Slug | None:
@@ -216,6 +207,13 @@ def _first_change(
             continue
         if any(r.blocks(occ.path, occ.text, target.text, cand.kind) for r in config.ignore):
             continue
+        if cand.note:
+            notes.append(cand.note)
+        if occ.is_comparison:
+            notes.append(
+                f"`{occ.path}:{occ.line}` compares against `{occ.text}`; check that the condition "
+                f"should now match `{target.text}`."
+            )
         return Change(occ, model, slug, cand.model, target, cand.kind, strategy, tuple(notes), price_weights)
     return None
 
@@ -234,10 +232,31 @@ def _prerelease_hint(model: Model, catalog: Catalog, today: dt.date) -> str:
     return f" (prerelease successor available: {previews[0]}; set allow-prerelease to use it)"
 
 
+# A file naming this many versions of one model line, or this many models in
+# total, is a list of models (a registry, price table, leaderboard, docs page,
+# test matrix), not a model choice.
+SAME_LINE_THRESHOLD = 3
+ANY_MODEL_THRESHOLD = 8
+
+
+def _file_models(occurrences: list[Occurrence], catalog: Catalog) -> dict[str, dict[str, set[str]]]:
+    """path -> family key -> model keys referenced in that file."""
+    out: dict[str, dict[str, set[str]]] = {}
+    for occ in occurrences:
+        hit = catalog.lookup(occ.text)
+        if hit:
+            out.setdefault(occ.path, {}).setdefault(hit[0].identity.family_key, set()).add(hit[0].key)
+    return out
+
+
 def build_plan(occurrences: list[Occurrence], catalog: Catalog, config: Config, today: dt.date) -> Plan:
     changes: list[Change] = []
     findings: list[Finding] = []
     cache: dict[tuple[str, int], list[Candidate] | str] = {}
+    in_file = _file_models(occurrences, catalog)
+    # A slug that is a table key on a line stays as-is everywhere on that line:
+    # {"claude-opus-4-7": {"name": "claude-opus-4-7"}}
+    keyed_lines = {(o.path, o.line, o.text) for o in occurrences if o.is_mapping_key}
 
     for occ in occurrences:
         hit = catalog.lookup(occ.text)
@@ -246,6 +265,31 @@ def build_plan(occurrences: list[Occurrence], catalog: Catalog, config: Config, 
             continue
         model, slug = hit
         life = model.lifecycle(today)
+
+        if occ.context == "comment" and not config.detection.comments:
+            findings.append(Finding(occ, model, "info", "in a comment (detection.comments is off)"))
+            continue
+        if occ.context == "prose" and not config.detection.prose:
+            findings.append(Finding(occ, model, "info", "in prose, not code (detection.prose is off)"))
+            continue
+        if not config.detection.model_lists and (occ.path, occ.line, occ.text) in keyed_lines:
+            findings.append(Finding(occ, model, "info", "used as a key in a model table (detection.model-lists is off)"))
+            continue
+        families = in_file.get(occ.path, {})
+        versions = families.get(model.identity.family_key, set())
+        total = sum(len(v) for v in families.values())
+        if not config.detection.model_lists and (
+            len(versions) >= SAME_LINE_THRESHOLD or total >= ANY_MODEL_THRESHOLD
+        ):
+            what = (
+                f"{len(versions)} versions of {model.identity.family}"
+                if len(versions) >= SAME_LINE_THRESHOLD
+                else f"{total} different models"
+            )
+            findings.append(
+                Finding(occ, model, "info", f"file names {what}; treated as a model list (detection.model-lists is off)")
+            )
+            continue
 
         if any(
             r.blocks(occ.path, occ.text, None, None) for r in config.ignore if not (r.target or r.update_types)
@@ -274,7 +318,10 @@ def build_plan(occurrences: list[Occurrence], catalog: Catalog, config: Config, 
 
         if change is None and life != "active" and rule.strategy == "cost-optimized":
             # A retiring model must move somewhere: fall back to its own line.
-            fallback = same_family(model, catalog, rule.same_family, today)
+            try:
+                fallback = same_family(model, catalog, rule.same_family, today, weights)
+            except NoCandidates:
+                fallback = []
             change = _first_change(occ, model, slug, fallback, "same-family", config, unrenderable, weights)
             if change:
                 why = reason or "no cheaper model met the benchmark bar"
@@ -287,6 +334,18 @@ def build_plan(occurrences: list[Occurrence], catalog: Catalog, config: Config, 
                     ),
                 )
 
+        if change and not config.detection.model_lists and change.to_model is not model:
+            if change.to_model.key in {k for keys in in_file.get(occ.path, {}).values() for k in keys}:
+                findings.append(
+                    Finding(
+                        occ,
+                        model,
+                        "info",
+                        f"file already references {change.to_model.display_name}; "
+                        "bumping would duplicate it (detection.model-lists is off)",
+                    )
+                )
+                continue
         if change:
             changes.append(change)
             continue

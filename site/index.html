@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ModelBump · Dependabot for LLM model IDs</title>
+  <meta name="description" content="ModelBump finds hard-coded LLM model IDs in your repository and opens a pull request when a newer release of the same model ships. GitHub Action and CLI.">
+  <meta property="og:title" content="ModelBump · Dependabot for LLM model IDs">
+  <meta property="og:description" content="Pull requests that move claude-opus-5 to claude-opus-5-5, written exactly the way your code wrote it.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0F1320">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Martian+Mono:wdth,wght@75..112.5,300..700&family=Schibsted+Grotesk:ital,wght@0,400..800;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="#top" aria-label="ModelBump home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="3" width="26" height="26" rx="7" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 19.5 16 13.5l6 6" fill="none" stroke="var(--marker)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>ModelBump</span>
+      </a>
+      <nav aria-label="Sections">
+        <ul class="nav-links">
+          <li><a href="#try">Try it</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#strategies">Strategies</a></li>
+          <li><a href="#configure">Set up</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </nav>
+      <a class="nav-gh" href="https://github.com/cheesejaguar/ModelBump">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <p class="eyebrow">GitHub Action · CLI · MIT licensed</p>
+        <div class="hero-slug" aria-hidden="true">
+          <div class="slug" id="hero-slug"><span class="slug-pre">claude-opus-5</span><span class="slug-mid"><span class="slug-roll"><span class="slug-old"></span><span class="slug-new">-5</span></span></span><span class="slug-post"></span></div>
+          <p class="slug-caption" id="hero-caption"><code>claude-opus-5</code> <span class="arrow">→</span> <code>claude-opus-5-5</code><span class="kind">minor</span></p>
+        </div>
+        <h1>Dependabot for the model IDs hard&#8209;coded in your code.</h1>
+        <p class="lede">ModelBump finds slugs like <code>claude-opus-5</code> or <code>openai/gpt-5-mini</code> in your repository and opens a pull request when a newer release of the same model ships, written exactly the way your code wrote it.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#configure">Add to a repository</a>
+          <button class="command" type="button" data-copy="curl -fsSL https://cheesejaguar.github.io/ModelBump/install.sh | bash" aria-label="Copy install command">
+            <span class="prompt" aria-hidden="true">$</span>
+            <span class="command-text">curl -fsSL https://cheesejaguar.github.io/ModelBump/install.sh | bash</span>
+            <span class="copy-state" aria-hidden="true">Copy</span>
+          </button>
+        </div>
+        <p class="hero-meta" id="hero-meta">Catalog of LLM models from 16 labs, refreshed daily.</p>
+      </div>
+    </section>
+
+    <section class="section" id="try" aria-labelledby="try-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="try-title">Paste your code</h2>
+          <p>Runs in your browser against today's catalog. Nothing is uploaded.</p>
+        </div>
+        <div class="demo">
+          <div class="pane pane-input">
+            <div class="pane-bar">
+              <div class="tabs" role="tablist" aria-label="Sample code">
+                <button role="tab" type="button" class="tab" data-sample="python" aria-selected="true">Python</button>
+                <button role="tab" type="button" class="tab" data-sample="typescript" aria-selected="false">TypeScript</button>
+                <button role="tab" type="button" class="tab" data-sample="yaml" aria-selected="false">YAML</button>
+              </div>
+              <button type="button" class="link-button" id="demo-clear">Clear</button>
+            </div>
+            <label class="sr-only" for="demo-input">Code to scan</label>
+            <textarea id="demo-input" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+          </div>
+          <div class="pane pane-output" aria-live="polite">
+            <div class="pane-bar"><span class="pane-title" id="demo-summary">Proposed changes</span></div>
+            <div class="diff" id="demo-diff"></div>
+          </div>
+        </div>
+        <div class="prs" id="demo-prs" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="how-title">One model, many spellings</h2>
+          <p>Every slug is read as a vendor, a model line and a version. A bump moves along the version and writes the result back in the same format, so code that talks to Bedrock keeps talking to Bedrock.</p>
+        </div>
+        <div class="spellings" role="table" aria-label="Claude Opus 4.5 written for different hosts, and what ModelBump changes it to">
+          <div class="spell-row spell-head" role="row"><span role="columnheader">Where your code calls it</span><span role="columnheader">Today</span><span role="columnheader">After ModelBump</span></div>
+          <div class="spell-row" role="row"><span role="cell">Anthropic API</span><code role="cell">claude-opus-4-5</code><code role="cell" class="new">claude-opus-5-5</code></div>
+          <div class="spell-row" role="row"><span role="cell">Anthropic API, dated snapshot</span><code role="cell">claude-opus-4-5-20251101</code><code role="cell" class="new">claude-opus-5-5<small>no dated id yet; noted in the PR</small></code></div>
+          <div class="spell-row" role="row"><span role="cell">OpenRouter, Vercel AI Gateway</span><code role="cell">anthropic/claude-opus-4.5</code><code role="cell" class="new">anthropic/claude-opus-5.5</code></div>
+          <div class="spell-row" role="row"><span role="cell">OpenRouter batch variant</span><code role="cell">anthropic/claude-opus-4.5:batch</code><code role="cell" class="new">anthropic/claude-opus-5.5:batch</code></div>
+          <div class="spell-row" role="row"><span role="cell">Google Vertex AI</span><code role="cell">claude-opus-4-5@20251101</code><code role="cell" class="new">claude-opus-5-5</code></div>
+          <div class="spell-row" role="row"><span role="cell">Amazon Bedrock, versioned id</span><code role="cell">us.anthropic.claude-opus-4-5-20251101-v1:0</code><span role="cell" class="same">Unchanged: newer Opus models have no versioned Bedrock id</span></div>
+        </div>
+        <div class="points">
+          <div class="point">
+            <h3>Exact IDs only</h3>
+            <p>Detection uses a catalog of real model IDs from OpenRouter and the vendors. <code>claude-opus-5</code> never matches inside <code>claude-opus-5-5</code>, and an ID ModelBump doesn't know is left alone.</p>
+          </div>
+          <div class="point">
+            <h3>No invented IDs</h3>
+            <p>Replacements are looked up, never pattern-built. If the newer model doesn't exist in your format (say, no Bedrock id yet), the reference stays put and the plan says why.</p>
+          </div>
+          <div class="point">
+            <h3>One pull request per model</h3>
+            <p>Every place that names Claude Opus 5 moves together, with prices, release dates and the vendor's migration notes in the PR. Close it to skip that release.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="strategies" aria-labelledby="strategies-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="strategies-title">Choose how far a model moves</h2>
+          <p>Set a strategy for the whole repository or per path. Claude stays Claude, GPT stays GPT, and open-weight models swap only for open-weight models.</p>
+        </div>
+        <div class="strategy-grid">
+          <article class="strategy">
+            <header>
+              <h3><code>same-family</code></h3>
+              <span class="tag">default</span>
+            </header>
+            <p>Newer release of the same line. Opus stays Opus, mini stays mini. Limit how far it goes with <code>update-types</code>.</p>
+            <ol class="ladder" aria-label="Example bumps by update type">
+              <li><span class="ladder-type">snapshot</span><code>gpt-4o-2024-08-06</code><span class="arrow">→</span><code class="new">gpt-4o-2024-11-20</code></li>
+              <li><span class="ladder-type">minor</span><code>claude-opus-5</code><span class="arrow">→</span><code class="new">claude-opus-5-5</code></li>
+              <li><span class="ladder-type">major</span><code>claude-opus-4-8</code><span class="arrow">→</span><code class="new">claude-opus-5-5</code></li>
+            </ol>
+            <p class="fine">A newer release that costs more than 3× as much is skipped, so <code>gpt-3.5-turbo</code> doesn't quietly become a model that costs 20× more.</p>
+          </article>
+          <article class="strategy">
+            <header>
+              <h3><code>cost-optimized</code></h3>
+            </header>
+            <p>The cheapest model in the same ecosystem that scores at least as well on the benchmark you choose: Artificial Analysis indexes or your own eval scores.</p>
+            <dl class="compare">
+              <div><dt>Current</dt><dd><code>claude-opus-5</code><span>score 70 · $10.00 / 1M</span></dd></div>
+              <div><dt>Proposed</dt><dd><code class="new">claude-sonnet-5-5</code><span>score 71 · $4.00 / 1M <b>−60%</b></span></dd></div>
+            </dl>
+            <p class="fine">Example scores from a config file. Prices are blended 3:1 input to output, per million tokens.</p>
+          </article>
+        </div>
+        <div class="ecosystems" id="ecosystems" aria-label="Ecosystems for cost-optimized mode, with the number of models each lab has in today's catalog">
+          <!-- filled from catalog data -->
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="leaves" aria-labelledby="leaves-title">
+      <div class="wrap narrow">
+        <div class="section-head">
+          <h2 id="leaves-title">What it leaves alone</h2>
+          <p>Tested against aider, LiteLLM, the Vercel AI SDK, the OpenAI Agents SDK and Anthropic's cookbooks before release. A model ID is only rewritten where it is a choice your code makes.</p>
+        </div>
+        <ul class="leaves">
+          <li><strong>Comments and prose.</strong> <code># was gpt-4o before March</code> stays true. Markdown code blocks and inline code are still updated.</li>
+          <li><strong>Model lists.</strong> Registries, price tables, leaderboards and docs that name many models, and slugs used as table keys.</li>
+          <li><strong>History.</strong> Changelogs, blog posts, recorded API cassettes, test fixtures, snapshots and data files.</li>
+          <li><strong>Your edits.</strong> Push a commit to a ModelBump branch and it stops touching that branch. Close a PR and that release is skipped.</li>
+          <li><strong>Lines you pin.</strong> Add <code># modelbump: ignore</code> to a line, or <code>ignore</code> rules to the config.</li>
+        </ul>
+        <p class="fine">Conditions like <code>if model == "claude-opus-5"</code> are still updated, and the pull request lists them so you can check the logic.</p>
+      </div>
+    </section>
+
+    <section class="section setup" id="configure" aria-labelledby="configure-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="configure-title">Add it to a repository</h2>
+          <p>Two files: a weekly workflow and a short config. Pick your settings, then add them with a link, a script, or by hand.</p>
+        </div>
+        <div class="setup-grid">
+          <form class="settings" id="settings" aria-label="Settings">
+            <fieldset>
+              <legend>Strategy</legend>
+              <label class="choice"><input type="radio" name="strategy" value="same-family" checked><span><b>same-family</b> Newer release of the same model line</span></label>
+              <label class="choice"><input type="radio" name="strategy" value="cost-optimized"><span><b>cost-optimized</b> Same score or better, lower price</span></label>
+            </fieldset>
+            <fieldset>
+              <legend>Allowed updates</legend>
+              <label class="check"><input type="checkbox" name="update" value="snapshot" checked><span>snapshot</span></label>
+              <label class="check"><input type="checkbox" name="update" value="minor" checked><span>minor</span></label>
+              <label class="check"><input type="checkbox" name="update" value="major" checked><span>major</span></label>
+            </fieldset>
+            <fieldset>
+              <legend>Schedule</legend>
+              <label class="choice inline"><input type="radio" name="schedule" value="weekly" checked><span>Weekly</span></label>
+              <label class="choice inline"><input type="radio" name="schedule" value="daily"><span>Daily</span></label>
+            </fieldset>
+            <fieldset>
+              <legend>Pull requests</legend>
+              <label class="choice inline"><input type="radio" name="grouping" value="per-model" checked><span>One per model</span></label>
+              <label class="choice inline"><input type="radio" name="grouping" value="single"><span>One for everything</span></label>
+            </fieldset>
+            <label class="check"><input type="checkbox" name="prerelease"><span>Allow preview models</span></label>
+          </form>
+
+          <div class="methods">
+            <div class="tabs method-tabs" role="tablist" aria-label="How to add ModelBump">
+              <button role="tab" type="button" class="tab" id="tab-link" aria-controls="panel-link" aria-selected="true">GitHub link</button>
+              <button role="tab" type="button" class="tab" id="tab-script" aria-controls="panel-script" aria-selected="false" tabindex="-1">Install script</button>
+              <button role="tab" type="button" class="tab" id="tab-files" aria-controls="panel-files" aria-selected="false" tabindex="-1">Copy files</button>
+              <button role="tab" type="button" class="tab" id="tab-cli" aria-controls="panel-cli" aria-selected="false" tabindex="-1">CLI</button>
+            </div>
+
+            <div class="method" id="panel-link" role="tabpanel" aria-labelledby="tab-link">
+              <p>Opens GitHub's editor with the file filled in. Commit it there, then repeat for the config.</p>
+              <div class="repo-row">
+                <label for="repo">Repository</label>
+                <input id="repo" placeholder="owner/name" autocomplete="off" spellcheck="false">
+                <label for="branch">Branch</label>
+                <input id="branch" value="main" autocomplete="off" spellcheck="false">
+              </div>
+              <p class="field-error" id="repo-error" hidden>Enter the repository as owner/name, for example vercel/ai.</p>
+              <ol class="steps">
+                <li><a class="button primary" id="open-workflow" href="#" aria-disabled="true">Add the workflow on GitHub</a></li>
+                <li><a class="button" id="open-config" href="#" aria-disabled="true">Add the config on GitHub</a></li>
+                <li><a class="button" id="open-settings" href="#" aria-disabled="true">Allow Actions to open pull requests</a><span class="hint">Settings → Actions → General → Workflow permissions</span></li>
+              </ol>
+              <p class="fine">If GitHub opens an empty editor, use <b>Copy files</b> and paste the contents in.</p>
+            </div>
+
+            <div class="method" id="panel-script" role="tabpanel" aria-labelledby="tab-script" hidden>
+              <p>Run in the root of your repository. It writes both files, stages them, and offers to turn on the pull request setting with the GitHub CLI.</p>
+              <button class="command block" type="button" id="script-command" data-copy="">
+                <span class="prompt" aria-hidden="true">$</span><span class="command-text"></span><span class="copy-state" aria-hidden="true">Copy</span>
+              </button>
+              <p class="fine"><a href="install.sh">Read the script</a> before running it. Options: <code>--yes</code>, <code>--no-settings</code>, <code>--force</code>.</p>
+            </div>
+
+            <div class="method" id="panel-files" role="tabpanel" aria-labelledby="tab-files" hidden>
+              <div class="file">
+                <div class="file-bar"><code>.github/workflows/modelbump.yml</code><button type="button" class="link-button" data-copy-from="workflow-yaml">Copy</button></div>
+                <pre id="workflow-yaml"></pre>
+              </div>
+              <div class="file">
+                <div class="file-bar"><code>.github/modelbump.yml</code><button type="button" class="link-button" data-copy-from="config-yaml">Copy</button></div>
+                <pre id="config-yaml"></pre>
+              </div>
+            </div>
+
+            <div class="method" id="panel-cli" role="tabpanel" aria-labelledby="tab-cli" hidden>
+              <p>See what would change before adding anything. Needs <a href="https://docs.astral.sh/uv/">uv</a>.</p>
+              <button class="command block" type="button" data-copy="uvx --from git+https://github.com/cheesejaguar/ModelBump modelbump plan --diff">
+                <span class="prompt" aria-hidden="true">$</span><span class="command-text">uvx --from git+https://github.com/cheesejaguar/ModelBump modelbump plan --diff</span><span class="copy-state" aria-hidden="true">Copy</span>
+              </button>
+              <p class="fine">Also <code>modelbump apply</code> to edit the working tree, and <code>modelbump pr</code> to open pull requests with <code>gh</code>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="wrap narrow">
+        <div class="section-head">
+          <h2 id="faq-title">Questions</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Will a newer model change how my app behaves?</summary>
+            <p>It can: output style, tool use and accepted parameters change between releases. That's why ModelBump opens pull requests instead of committing. Each one links the vendor's migration notes, and your tests and evals decide whether to merge.</p>
+          </details>
+          <details>
+            <summary>Do I need any API keys?</summary>
+            <p>No. The model catalog comes from OpenRouter's public list and a curated file of first-party IDs. Optional keys add more: <code>ANTHROPIC_API_KEY</code> and <code>OPENAI_API_KEY</code> confirm first-party IDs, and <code>ARTIFICIAL_ANALYSIS_API_KEY</code> supplies benchmark scores for <code>cost-optimized</code>.</p>
+          </details>
+          <details>
+            <summary>Is my code sent anywhere?</summary>
+            <p>No. ModelBump runs in your GitHub Actions runner and only downloads public model lists. The demo on this page runs entirely in your browser.</p>
+          </details>
+          <details>
+            <summary>How is this different from Dependabot or Renovate?</summary>
+            <p>They update packages declared in manifests. A model ID is a string in your source, config or <code>.env</code>, in one of several host formats, so it needs its own detection and its own idea of what "newer" means.</p>
+          </details>
+          <details>
+            <summary>Which providers are covered?</summary>
+            <p>Anthropic, OpenAI, Google, xAI, Meta, Mistral, and the Chinese open-weight labs: DeepSeek, Qwen, Moonshot (Kimi), Z.ai (GLM), MiniMax, Xiaomi (MiMo), StepFun, Tencent and Baidu. Models from other labs are left alone.</p>
+          </details>
+          <details>
+            <summary>Does it work in monorepos and private repositories?</summary>
+            <p>Yes. Use the action's <code>path</code> input for a subdirectory, or <code>updates</code> rules in the config to set a strategy per path. Private repositories work the same way.</p>
+          </details>
+          <details>
+            <summary>Can I use it as a check instead of a bot?</summary>
+            <p>Yes. Run the action with <code>command: plan</code> and <code>fail-on-updates: true</code> on pull requests. Each outdated ID shows up as an annotation on the workflow run.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <p><b>ModelBump</b> <span id="footer-version"></span> · MIT licensed · <a href="https://github.com/cheesejaguar/ModelBump">Source on GitHub</a> · <a href="https://github.com/cheesejaguar/ModelBump/issues">Report an issue</a></p>
+      <p class="fine" id="footer-data">Model data from OpenRouter and vendor documentation.</p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>

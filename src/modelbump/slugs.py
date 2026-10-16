@@ -20,8 +20,10 @@ from .vendors import VENDORS
 
 PRERELEASE_TOKENS = {"preview", "exp", "experimental", "beta", "alpha", "rc"}
 # Tokens that carry no identity: "instruct"/"it" vary between hosts for the
-# same weights, "latest" marks a floating alias.
+# same weights, "latest" marks a floating alias. OpenAI's "-instruct" models are
+# a different product (the completions API), so the token is kept there.
 NEUTRAL_TOKENS = {"instruct", "it", "hf", "latest"}
+MEANINGFUL_TOKENS = {"openai": {"instruct"}}
 
 _SIZE_RE = re.compile(r"^(?:a?\d+(?:\.\d+)?[bmtk]|\d+e)$")  # 27b, a22b, 2.4t, 128e
 _VERSION_RE = re.compile(r"^(?P<pre>[a-z]*?)(?P<ver>\d+(?:\.\d+)*)(?P<post>[a-z]*)$")
@@ -122,7 +124,8 @@ def parse(vendor: str, name: str, *, hyphen_versions: bool | None = None) -> Par
 
     tokens = [t for t in text.split("-") if t]
     alias = "latest" in tokens
-    tokens = [t for t in tokens if t not in NEUTRAL_TOKENS]
+    neutral = NEUTRAL_TOKENS - MEANINGFUL_TOKENS.get(vendor, set())
+    tokens = [t for t in tokens if t not in neutral]
     prerelease = any(t in PRERELEASE_TOKENS for t in tokens)
     tokens = [t for t in tokens if t not in PRERELEASE_TOKENS]
     tokens, snapshot = _strip_snapshot(tokens)
