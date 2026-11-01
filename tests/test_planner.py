@@ -154,16 +154,24 @@ def test_chinese_open_weights_stay_chinese_open_weights(scored, today):
 
 
 def test_vendor_scope(scored, today):
+    src = '"Qwen/Qwen3-235B-A22B-Instruct-2507"'
+    # ecosystem scope crosses to a cheaper DeepSeek model ...
+    (change,) = plan_for(scored, today, src, parse_config(COST)).changes
+    assert change.to_model.vendor == "deepseek"
+    # ... vendor scope does not, and no cheaper open Qwen model keeps the score
     config = parse_config({**COST, "cost-optimized": {"scope": "vendor"}})
-    plan = plan_for(scored, today, '"Qwen/Qwen3-235B-A22B-Instruct-2507"', config)
-    assert all(c.to_model.vendor == "qwen" for c in plan.changes)
+    assert plan_for(scored, today, src, config).changes == []
 
 
 def test_open_weights_preserved(scored, today):
-    # closed qwen3.8-max is cheaper than nothing here, but open -> closed is never allowed
-    config = parse_config({**COST, "cost-optimized": {"min-savings": 0, "max-score-drop": 0.5}})
+    # make closed qwen3.8-max the cheapest and best-scoring candidate; open -> closed is still never allowed
+    closed = scored.models["qwen/qwen-max@3.8"]
+    assert not closed.open_weights
+    closed.price_in, closed.price_out = 0.01, 0.02
+    config = parse_config({**COST, "cost-optimized": {"min-savings": 0, "max-score-drop": 0.5, "prefer": "best-score"}})
     plan = plan_for(scored, today, '"deepseek/deepseek-v3.2"', config)
-    assert all(c.to_model.open_weights for c in plan.changes)
+    assert bumps(plan) == [("deepseek/deepseek-v3.2", "deepseek/deepseek-v4-flash", "switch")]
+    assert plan.changes[0].to_model.open_weights
 
 
 def test_missing_score_is_reported(catalog, today):

@@ -49,7 +49,7 @@ def test_derived_native_ids_are_marked(catalog):
 
 
 def test_openrouter_effort_aliases_are_not_native(catalog):
-    assert catalog.lookup("openai/o4-mini-high") is not None
+    assert catalog.lookup("openai/o4-mini-high")[0].key == "openai/o-mini-high@4"
     assert catalog.lookup("o4-mini-high") is None
 
 
@@ -63,9 +63,9 @@ def test_native_list_confirms_and_prunes_derived_ids(catalog):
     )
     assert not catalog.lookup("gpt-5.5")[1].derived
     assert catalog.lookup("gpt-5.4") is None  # derived, not in the live list
-    assert catalog.lookup("openai/gpt-5.4") is not None  # OpenRouter id untouched
+    assert catalog.lookup("openai/gpt-5.4")[0].key == "openai/gpt@5.4"  # OpenRouter id untouched
     assert catalog.lookup("text-embedding-3-large") is None  # never creates non-chat models
-    assert catalog.lookup("gpt-4o-2024-08-06") is not None  # seed ids are not derived
+    assert catalog.lookup("gpt-4o-2024-08-06")[0].key == "openai/gpt-o@4"  # seed ids are not derived
 
 
 def test_native_list_can_add_new_claude_models(catalog):

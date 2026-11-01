@@ -114,22 +114,16 @@ def test_creates_one_pr_per_update(project, catalog, today, gh):
     assert ["label", "create", "llm-models", "--description", "Model slug updates by ModelBump"] in state["calls"]
 
 
-def test_rerun_without_changes_leaves_prs_alone(project, catalog, today, gh, monkeypatch):
+def remote_heads(project):
+    return git(project, "ls-remote", "--heads", "origin")
+
+
+def test_rerun_without_changes_leaves_prs_alone(project, catalog, today, gh):
     run_prs(project, catalog, today)
-    pushes = []
-    import modelbump.github as mg
-
-    real_run = mg._run
-
-    def spy(cmd, cwd, **kw):
-        if cmd[:2] == ["git", "push"]:
-            pushes.append(cmd)
-        return real_run(cmd, cwd, **kw)
-
-    monkeypatch.setattr(mg, "_run", spy)
+    before = remote_heads(project)
     results = run_prs(project, catalog, today)
     assert [r.action for r in results] == ["unchanged", "unchanged"]
-    assert pushes == []
+    assert remote_heads(project) == before  # nothing was pushed
     assert gh.calls("pr", "edit") == []
 
 

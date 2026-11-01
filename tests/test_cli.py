@@ -80,6 +80,14 @@ def test_apply_refuses_stale_offsets(repo, catalog, today):
 
 
 def test_strategy_flag_and_config_errors(project, capsys):
+    # --strategy overrides the config; cost-optimized needs scores the offline catalog lacks
+    code, out, _ = run(capsys, "plan", "-C", str(project), "--json", "--strategy", "cost-optimized")
+    data = json.loads(out)
+    assert code == 0 and data["changes"] == []
+    assert [f["message"].split(";")[0] for f in data["findings"]] == [
+        "no benchmark score for Claude Opus 5",
+        "no benchmark score for Claude Sonnet 4.5",
+    ]
     (project / ".github").mkdir()
     (project / ".github" / "modelbump.yml").write_text("version: 1\nstrategy: sideways\n")
     code, _, err = run(capsys, "plan", "-C", str(project))
