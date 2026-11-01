@@ -38,7 +38,10 @@ def test_rule_overrides_merge_over_top_level_settings():
 def test_custom_ecosystems_move_vendors():
     c = parse_config({"ecosystems": {"frontier": ["anthropic", "openai"]}})
     assert c.ecosystem_of("openai") == "frontier"
-    assert "openai" not in c.ecosystems.get("openai", [])
+    assert c.ecosystem_of("anthropic") == "frontier"
+    assert c.ecosystems["frontier"] == ["anthropic", "openai"]
+    # emptied default ecosystems are dropped rather than left behind
+    assert "openai" not in c.ecosystems and "anthropic" not in c.ecosystems
 
 
 @pytest.mark.parametrize(
