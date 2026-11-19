@@ -12,7 +12,12 @@ permissions:
   pull-requests: write
 
 jobs:
+  shabbat-guard:
+    uses: ./.github/workflows/shabbat-guard.yml
+
   refresh:
+    needs: shabbat-guard
+    if: needs.shabbat-guard.outputs.proceed == 'true'
     runs-on: >-
       ${{
         (github.event_name == 'pull_request' &&

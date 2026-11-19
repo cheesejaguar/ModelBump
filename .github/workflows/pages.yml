@@ -5,7 +5,9 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "17 5 * * *" # daily, so the live demo knows about new models
+    # Mon-Fri 05:17 UTC. Sat 05:17 and Sun 05:17 UTC fall inside the Shabbat
+    # union (Sun 05:17 is still before the PST end at 05:30). LS-126.
+    - cron: "17 5 * * 1-5" # weekdays, so the live demo knows about new models
   workflow_dispatch:
 
 permissions:
@@ -18,7 +20,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  shabbat-guard:
+    uses: ./.github/workflows/shabbat-guard.yml
+
   build:
+    needs: shabbat-guard
+    if: needs.shabbat-guard.outputs.proceed == 'true'
     runs-on: >-
       ${{
         (github.event_name == 'pull_request' &&
